@@ -1,0 +1,30 @@
+.env
+.idea/
+.vscode/
+flowerenv/
+
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+# .env
+# *.sqlite3
+
+# Django
+*.log
+*.pot
+*.pyc
+*.pyo
+*.db
+
+# VS Code
+.vscode/
+
+# Docker
+# .dockerignore
+

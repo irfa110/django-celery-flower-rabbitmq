@@ -1,0 +1,111 @@
+version: "3.3"
+services:
+  # my-db:
+  #   image: mariadb:10.5.8
+  #   container_name: my-db
+  #   restart: always
+  #   ports:
+  #     - ${MYSQL_DB_PORT}:3306
+  #   command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  #     MYSQL_DATABASE: ${MYSQL_DATABASE}
+  #     MYSQL_DB_PORT: ${MYSQL_DB_PORT}
+  #     MYSQL_USER: ${MYSQL_USER}
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  #   volumes:
+  #     - mydata:/var/lib/mysql
+  #   networks:
+  #     - elastic
+
+  backend:
+    build:
+      context: .
+      dockerfile: env/Dockerfile
+    entrypoint: [ "./env/dev/docker-entrypoint.sh" ]
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/app
+    ports:
+      - ${DJANGO_SERVER_PORT}:${DJANGO_SERVER_PORT}
+    # depends_on:
+    #   - my-db
+    environment:
+      DJANGO_SERVER_PORT: ${DJANGO_SERVER_PORT}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST}
+    networks:
+      - elastic
+
+  rabbitmq:
+    image: rabbitmq:3.8.21-management
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST}
+    ports:
+      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
+      - "${RABBITMQ_MANAGEMENT_PORT}:${RABBITMQ_MANAGEMENT_PORT}" # access rabbitmq management plugin on this port
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    networks:
+      - elastic
+
+  celery-worker:
+    restart: always
+    build:
+      context: .
+      dockerfile: env/Dockerfile
+    entrypoint: [ "./env/dev/celery-worker-entrypoint.sh" ]
+    volumes:
+      - .:/app
+    depends_on:
+      - backend
+      # - db
+      - rabbitmq
+    networks:
+      - elastic
+
+  celery-beat:
+    restart: always
+    build:
+      context: .
+      dockerfile: env/Dockerfile
+    entrypoint: [ "./env/dev/celery-beat-entrypoint.sh" ]
+    volumes:
+      - .:/app
+    depends_on:
+      - backend
+      # - db
+      - rabbitmq
+    networks:
+      - elastic
+
+  flower:
+    image: mher/flower
+    build:
+      context: .
+      dockerfile: env/Dockerfile
+    entrypoint: [ "./env/dev/celery-flower-entrypoint.sh" ]
+    ports:
+      - "${CELERY_FLOWER_PORT}:5555"
+    volumes:
+      - .:/app
+    depends_on:
+      - backend
+      - rabbitmq
+      - celery-worker
+    networks:
+      - elastic
+
+volumes:
+  # mydata:
+  rabbitmqdata:
+  # redisdata:
+
+networks:
+  elastic:
+    driver: bridge
